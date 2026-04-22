@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import "./styles.css";
-import { fetchNews, type ApiArticle } from "./lib/newsapi";
 
 type Category =
   | "technology"
@@ -22,6 +21,7 @@ type Article = {
   image: string;
   publishedAt: string;
   source: { name: string };
+  category: Category;
 };
 
 const categories: Category[] = [
@@ -39,19 +39,108 @@ const categories: Category[] = [
 
 const FAVORITES_KEY = "news-reader-favorites";
 const PAGE_SIZE = 3;
-const placeholderImage = "https://picsum.photos/1200/700?placeholder";
 
-function normalizeArticle(article: ApiArticle, index: number): Article {
-  return {
-    id: article.url || `article-${index}`,
-    title: article.title || "Untitled article",
-    description: article.description || "No description available.",
-    url: article.url || "#",
-    image: article.image || `${placeholderImage}&i=${index}`,
-    publishedAt: article.publishedAt || new Date().toISOString(),
-    source: { name: article.source?.name || "Unknown source" },
-  };
-}
+const demoArticles: Article[] = [
+  {
+    id: "1",
+    title: "AI tools are reshaping how teams work",
+    description:
+      "Companies are adopting AI for research, customer support, and workflow automation across many industries.",
+    url: "https://example.com/ai-tools",
+    image: "https://picsum.photos/1200/700?1",
+    publishedAt: "2026-04-20T10:00:00Z",
+    source: { name: "Tech Journal" },
+    category: "technology",
+  },
+  {
+    id: "2",
+    title: "Scientists report progress in quantum computing",
+    description:
+      "New approaches to stability and error correction are helping researchers move closer to practical systems.",
+    url: "https://example.com/quantum",
+    image: "https://picsum.photos/1200/700?2",
+    publishedAt: "2026-04-20T09:00:00Z",
+    source: { name: "Science Daily" },
+    category: "science",
+  },
+  {
+    id: "3",
+    title: "NBA playoff race heats up in final stretch",
+    description:
+      "Fans are watching key matchups as teams fight for playoff positioning and momentum.",
+    url: "https://example.com/nba",
+    image: "https://picsum.photos/1200/700?3",
+    publishedAt: "2026-04-20T08:00:00Z",
+    source: { name: "Sports Weekly" },
+    category: "sports",
+  },
+  {
+    id: "4",
+    title: "Travel demand rises for shorter weekend getaways",
+    description:
+      "Airlines and hotels are seeing strong demand for flexible spring and summer trips.",
+    url: "https://example.com/travel",
+    image: "https://picsum.photos/1200/700?4",
+    publishedAt: "2026-04-20T07:00:00Z",
+    source: { name: "Travel Weekly" },
+    category: "travel",
+  },
+  {
+    id: "5",
+    title: "Healthy meal planning gets easier with small routines",
+    description:
+      "Nutrition experts recommend simple repeatable habits instead of extreme diet changes.",
+    url: "https://example.com/food",
+    image: "https://picsum.photos/1200/700?5",
+    publishedAt: "2026-04-20T06:00:00Z",
+    source: { name: "Health & Food" },
+    category: "food",
+  },
+  {
+    id: "6",
+    title: "Streaming platforms compete with event-style releases",
+    description:
+      "Studios are experimenting with shorter release windows and bigger digital premieres.",
+    url: "https://example.com/entertainment",
+    image: "https://picsum.photos/1200/700?6",
+    publishedAt: "2026-04-20T05:00:00Z",
+    source: { name: "Entertainment Now" },
+    category: "entertainment",
+  },
+  {
+    id: "7",
+    title: "Business leaders prepare for a cautious quarter",
+    description:
+      "Executives are balancing cost control with selective investments in growth and hiring.",
+    url: "https://example.com/business",
+    image: "https://picsum.photos/1200/700?7",
+    publishedAt: "2026-04-20T04:00:00Z",
+    source: { name: "Market Brief" },
+    category: "business",
+  },
+  {
+    id: "8",
+    title: "Healthcare startups focus on remote monitoring",
+    description:
+      "Wearables and easier communication tools are helping shape the next wave of digital health.",
+    url: "https://example.com/health",
+    image: "https://picsum.photos/1200/700?8",
+    publishedAt: "2026-04-20T03:00:00Z",
+    source: { name: "Health Watch" },
+    category: "health",
+  },
+  {
+    id: "9",
+    title: "General news roundup: stories shaping the week",
+    description:
+      "A quick overview of developments across policy, markets, science, and culture.",
+    url: "https://example.com/general",
+    image: "https://picsum.photos/1200/700?9",
+    publishedAt: "2026-04-20T02:00:00Z",
+    source: { name: "Daily Brief" },
+    category: "general",
+  },
+];
 
 export default function App() {
   const [selectedCategory, setSelectedCategory] =
@@ -60,11 +149,6 @@ export default function App() {
   const [index, setIndex] = useState(0);
   const [showFavorites, setShowFavorites] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [liveArticles, setLiveArticles] = useState<Article[]>([]);
-  const [cache, setCache] = useState<Record<string, Article[]>>({});
-
   const [favoriteIds, setFavoriteIds] = useState<string[]>(() => {
     const saved = localStorage.getItem(FAVORITES_KEY);
     if (!saved) return [];
@@ -80,154 +164,37 @@ export default function App() {
     localStorage.setItem(FAVORITES_KEY, JSON.stringify(favoriteIds));
   }, [favoriteIds]);
 
-  const pageNumber = Math.floor(index / PAGE_SIZE) + 1;
-  const indexOnPage = index % PAGE_SIZE;
+  const filteredArticles = useMemo(() => {
+    if (showFavorites) {
+      return demoArticles.filter((article) => favoriteIds.includes(article.id));
+    }
 
-  const cacheKey = useMemo(() => {
     const trimmedSearch = search.trim().toLowerCase();
 
     if (trimmedSearch) {
-      return `search:${trimmedSearch}:page:${pageNumber}`;
+      return demoArticles.filter((article) =>
+        `${article.title} ${article.description} ${article.source.name}`
+          .toLowerCase()
+          .includes(trimmedSearch)
+      );
     }
 
-    return `category:${selectedCategory}:page:${pageNumber}`;
-  }, [search, selectedCategory, pageNumber]);
-
-  useEffect(() => {
-    if (showFavorites) return;
-
-    let cancelled = false;
-
-    async function loadArticles() {
-      if (cache[cacheKey]) {
-        setLiveArticles(cache[cacheKey]);
-        setError("");
-        setIsLoading(false);
-        return;
-      }
-
-      setIsLoading(true);
-      setError("");
-
-      try {
-        const data = await fetchNews({
-          q: search.trim() || undefined,
-          category: search.trim() ? undefined : selectedCategory,
-          page: pageNumber,
-        });
-
-        if (cancelled) return;
-
-        const normalized = (data.articles || []).map(normalizeArticle);
-        setLiveArticles(normalized);
-
-        setCache((prev) => ({
-          ...prev,
-          [cacheKey]: normalized,
-        }));
-      } catch (err) {
-        if (cancelled) return;
-
-        const message =
-          err instanceof Error ? err.message : "Failed to fetch news.";
-        setError(message);
-        setLiveArticles([]);
-      } finally {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
-      }
-    }
-
-    loadArticles();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [search, selectedCategory, showFavorites, cache, cacheKey, pageNumber]);
-
-  useEffect(() => {
-    if (showFavorites) return;
-    if (liveArticles.length < 2) return;
-    if (indexOnPage !== 1) return;
-
-    const nextPage = pageNumber + 1;
-    const trimmedSearch = search.trim().toLowerCase();
-
-    const nextKey = trimmedSearch
-      ? `search:${trimmedSearch}:page:${nextPage}`
-      : `category:${selectedCategory}:page:${nextPage}`;
-
-    if (cache[nextKey]) return;
-
-    fetchNews({
-      q: search.trim() || undefined,
-      category: search.trim() ? undefined : selectedCategory,
-      page: nextPage,
-    })
-      .then((data) => {
-        const normalized = (data.articles || []).map(normalizeArticle);
-
-        setCache((prev) => ({
-          ...prev,
-          [nextKey]: normalized,
-        }));
-      })
-      .catch(() => {});
-  }, [
-    cache,
-    indexOnPage,
-    liveArticles.length,
-    pageNumber,
-    search,
-    selectedCategory,
-    showFavorites,
-  ]);
+    return demoArticles.filter((article) => article.category === selectedCategory);
+  }, [favoriteIds, search, selectedCategory, showFavorites]);
 
   useEffect(() => {
     setIndex(0);
   }, [search, selectedCategory, showFavorites]);
 
-  const filteredArticles = useMemo(() => {
-    if (showFavorites) {
-      const allCachedArticles = Object.values(cache).flat();
-      const uniqueById = new Map<string, Article>();
+  const article = filteredArticles[index] || null;
+  const pageNumber = Math.floor(index / PAGE_SIZE) + 1;
+  const currentPageDots = filteredArticles.slice(
+    pageNumber * PAGE_SIZE - PAGE_SIZE,
+    pageNumber * PAGE_SIZE
+  );
 
-      allCachedArticles.forEach((article) => {
-        uniqueById.set(article.id, article);
-      });
-
-      return Array.from(uniqueById.values()).filter((article) =>
-        favoriteIds.includes(article.id)
-      );
-    }
-
-    return liveArticles;
-  }, [cache, favoriteIds, liveArticles, showFavorites]);
-
-  const pagedArticles = useMemo(() => {
-    if (showFavorites) {
-      return filteredArticles;
-    }
-
-    const trimmedSearch = search.trim().toLowerCase();
-    const prefix = trimmedSearch
-      ? `search:${trimmedSearch}:page:`
-      : `category:${selectedCategory}:page:`;
-
-    const matchingPages = Object.entries(cache)
-      .filter(([key]) => key.startsWith(prefix))
-      .sort(([a], [b]) => {
-        const pageA = Number(a.split(":").pop() || 0);
-        const pageB = Number(b.split(":").pop() || 0);
-        return pageA - pageB;
-      })
-      .flatMap(([, articles]) => articles);
-
-    return matchingPages.length > 0 ? matchingPages : liveArticles;
-  }, [cache, filteredArticles, liveArticles, search, selectedCategory, showFavorites]);
-
-  const article = pagedArticles[index] || null;
+  const canGoNext = index < filteredArticles.length - 1;
+  const canGoPrev = index > 0;
 
   function handleFavoriteToggle(id: string) {
     setFavoriteIds((prev) =>
@@ -242,15 +209,12 @@ export default function App() {
     setSearch("");
     setSelectedCategory(category);
     setIndex(0);
-    setError("");
   }
 
   function handleFavoritesClick() {
     setShowFavorites(true);
     setSearch("");
     setIndex(0);
-    setError("");
-    setIsLoading(false);
   }
 
   function handleSearchChange(value: string) {
@@ -258,16 +222,6 @@ export default function App() {
     setSearch(value);
     setIndex(0);
   }
-
-  const currentPageDots = showFavorites
-    ? filteredArticles.slice(
-        pageNumber * PAGE_SIZE - PAGE_SIZE,
-        pageNumber * PAGE_SIZE
-      )
-    : liveArticles;
-
-  const canGoNext = index < pagedArticles.length - 1;
-  const canGoPrev = index > 0;
 
   return (
     <div className="layout">
@@ -334,16 +288,7 @@ export default function App() {
           {showFilters ? "Hide Filters" : "Show Filters"}
         </button>
 
-        {isLoading ? (
-          <section className="empty-state">
-            <h2>Loading...</h2>
-          </section>
-        ) : error ? (
-          <section className="empty-state">
-            <h2>News Reader</h2>
-            <p>{error}</p>
-          </section>
-        ) : !article ? (
+        {!article ? (
           <section className="empty-state">
             <h2>No articles found</h2>
             <p>Try another category, search term, or favorites list.</p>
@@ -431,7 +376,7 @@ export default function App() {
               <button
                 className="pager-btn"
                 onClick={() =>
-                  setIndex((i) => Math.min(i + 1, pagedArticles.length - 1))
+                  setIndex((i) => Math.min(i + 1, filteredArticles.length - 1))
                 }
                 disabled={!canGoNext}
               >

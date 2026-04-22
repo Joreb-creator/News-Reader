@@ -21,16 +21,16 @@ A full-stack news application built with React + Vite (frontend) and Node.js + E
 
 ## 🔐 API Integration
 
-This project uses the **GNews API** as a data provider.
+## Demo Version
 
-The free tier of GNews includes:
-- request limits
-- delayed data
+The deployed portfolio version uses local demo data for a stable user experience.
 
-To handle this, the app includes:
-- caching of previously fetched pages
-- prefetching for smoother navigation
-- graceful error handling when limits are reached
+The full project was built against the GNews API and includes:
+- Express proxy setup
+- caching
+- prefetching
+- favorites
+- error handling for free-tier rate limits
 
 ## ⚠️ Note
 
