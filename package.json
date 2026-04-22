@@ -1,0 +1,13 @@
+{
+  "name": "news-reader",
+  "private": true,
+  "scripts": {
+    "server:install": "cd server && npm install",
+    "server:dev": "cd server && node server.js",
+    "web:dev": "cd web && npm run dev",
+    "dev": "concurrently \"npm run server:dev\" \"npm run web:dev\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0"
+  }
+}
